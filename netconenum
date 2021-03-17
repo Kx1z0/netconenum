@@ -12,7 +12,7 @@ redColour="\e[0;31m\033[1m"
 blueColour="\e[0;34m\033[1m"
 
 
-echo "$(netstat -ante | grep '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' | awk '{print $4,$7}' | cut -d "/" -f1 | sort -k2 -n)" | while read line; do
+echo "$(netstat -ante | grep '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' | awk '{print $4,$7}' | cut -d "/" -f1 | sort -k2 -n | sort -t " " -u)" | while read line; do
 
 	echo "Local Address: "$(echo $line | cut -d " " -f1) "--> User's UID:" $(echo $line | awk '{print $NF}')
 	uids=$(echo $line | awk '{print $NF}')
