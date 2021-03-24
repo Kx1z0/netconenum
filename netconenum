@@ -12,7 +12,9 @@ redColour="\e[0;31m\033[1m"
 blueColour="\e[0;34m\033[1m"
 
 
-echo "$(netstat -ante | grep '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' | awk '{print $4,$7}' | cut -d "/" -f1 | sort -k2 -n)" | while read line; do
+
+services_uids(){
+echo "$(netstat -ante | grep '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' | awk '{print $4,$7}' | cut -d "/" -f1 | sort -k1 -u)" | while read line; do
 
 	echo "Local Address: "$(echo $line | cut -d " " -f1) "--> User's UID:" $(echo $line | awk '{print $NF}')
 	uids=$(echo $line | awk '{print $NF}')
@@ -23,22 +25,183 @@ echo "$(netstat -ante | grep '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1
 		user=$(cat /etc/passwd | cut -d ":" -f1,3 | tr ':' ' '| grep $i)
 		if [ $(echo $user | awk '{print $1}') == "root" ]; then
 			echo -e "User: ${redColour}\e[103m$(echo $user | awk '{print $1}')\e[49m${endColour}\n"
-		
+
 		elif [ $(echo $user | awk '{print $1}') == "mysql" ]; then
 		        echo -e "User: ${greenColour} $(echo $user | awk '{print $1}') ${endColour}\n"
-		
+
 		else
 		echo -e "User: ${blueColour} $(echo $user | awk '{print $1}')${endColour}\n"
-		
+
 		fi
 
                 if ! [[ "$(echo $i)" =~ ^[0-9]+$ ]] ; then
 			echo -e "No UID \n"
 		fi
-  
+
 
 	fi
 	done
 done
+}
+
+checking_content(){
+
+
+echo "Checking Content"
+
+sockets=$(echo "$(netstat -ante | grep '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' | awk '{print $4}' | cut -d "/" -f1 | sort -k2 -n | sort -t " " -u)" | while read socket; do
+
+	echo $(echo $socket | cut -d " " -f1)
+
+done)
+
+path=$PATH
+
+apps=()
+
+#curl
+if [ $(which curl > /dev/null 2>&1 ; echo $?) = "0"  ]; then
+
+	curl_path=$(which curl | awk -F"/" '{$NF = ""; print}' | tr " " "/" | sed -e 's/.$//')
+
+	if [ $(echo "$path" | grep -c "$curl_path") = "1" ]; then
+		apps=("${apps[@]}" curl)
+	fi
+	else
+		echo "curl not found on the PATH system"
+fi
+
+
+curl_function(){
+
+curl_output=$(for i in $(echo "$sockets"); do echo -e "$blueColour[+]$i[+]$endColour\n\n$(timeout 2 curl -s --http0.9 $i --output - || echo -e $redColour-----Timeout $i-----$endColour)\n" & done 2>/dev/null)
+
+echo "$curl_output"
+
+}
+
+
+#nc
+if [ $(which nc > /dev/null 2>&1 ; echo $?) = "0"  ]; then
+
+	nc_path=$(which nc | awk -F"/" '{$NF = ""; print}' | tr " " "/" | sed -e 's/.$//')
+
+	if [ $(echo "$path" | grep -c "$nc_path") = "1" ]; then
+		apps=("${apps[@]}" nc)
+	fi
+	else
+		echo "nc not found on the PATH system"
+fi
+
+nc_function(){
+
+nc_output=$(for i in $(echo "$sockets") ; do echo -e "$blueColour[+]$i[+]$endColour\n\n$(echo -e 'GET / HTTP/1.1\r\nHost: localhost\r\n\r\n' | timeout 2 nc $(echo $i | tr ":" " ") || echo -e $redColour -----Timeout $i----- $endColour)\n" & done 2>/dev/null)
+
+echo "$nc_output"
+
+}
+
+#python
+if [ $(which python > /dev/null 2>&1 ; echo $?) = "0"  ]; then
+
+	python_path=$(which python | awk -F"/" '{$NF = ""; print}' | tr " " "/" | sed -e 's/.$//')
+
+	if [ $(echo "$path" | grep -c "$python_path") = "1" ]; then
+		apps=("${apps[@]}" python)
+	fi
+	else
+		echo "Python not found on the PATH system"
+fi
+
+python2_function(){
+
+if [ $(python -c 'import requests' 2>/dev/null; echo $?) == "0" ]; then
+python2_output=$(for i in $(echo "$sockets") ; do export i=$i; echo -e "$blueColour[+]$i[+]$endColour\n\n$(timeout 2 python -c 'import os; import requests; r = requests.get("http://" + os.environ["i"]); print r.text' || echo -e $redColour -----Timeout $i----- $endColour)\n" & done 2>/dev/null)
+
+echo "$python2_output"
+
+else
+	echo "Module requests is not installed."
+fi
+
+}
+
+#python3
+if [ $(which python3 > /dev/null 2>&1 ; echo $?) = "0"  ]; then
+
+	python3_path=$(which python3 | awk -F"/" '{$NF = ""; print}' | tr " " "/" | sed -e 's/.$//')
+
+	if [ $(echo "$path" | grep -c "$python3_path") = "1" ]; then
+		apps=("${apps[@]}" python3)
+	fi
+	else
+		echo "Python3 not found on the PATH system"
+fi
+
+python3_function(){
+
+if [ $(python3 -c 'import requests' 2>/dev/null; echo $?) == "0" ]; then
+
+python3_output=$(for i in $(echo "$sockets") ; do export i=$i; echo -e "$blueColour[+]$i[+]$endColour\n\n$(timeout 2 python3 -c 'import os; import requests; r = requests.get("http://" + os.environ["i"]); print(r.text)' || echo -e $redColour -----Timeout $i----- $endColour)\n" & done 2>/dev/null)
+
+echo "$python3_output"
+
+else
+	echo "Module requests is not installed."
+fi
+
+}
+
+####### Show installed apps to user and select one #########
+cont=1
+
+c=$(for i in "${apps[@]}"; do
+
+echo "$cont)" $i
+let cont=$cont+1
+
+done)
+
+echo "$c"
+
+read -p "Choose a number: " app_number
+
+app_name=$(echo "$c" | grep "$app_number)" | awk '{print $2}')
+
+#### Select the app ####
+
+case $app_name in
+
+	curl)
+		curl_function
+
+	;;
+
+	nc)
+		nc_function
+	;;
+
+	python)
+
+		python2_function
+	;;
+
+	python3)
+		python3_function
+	;;
+
+	*)
+		echo "Error"
+		exit 1
+	;;
+esac
+
+
+
+
+}
+
+services_uids
+checking_content
 
 #Dot/@kx1z0
