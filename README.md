@@ -1,2 +1,3 @@
 # netconenum
-A tool to find out which user is running a specific network connection. Useful for privilege escalation, because if we can exploit that network connection, we will have shell as the user running that network connection.
+Tool to see which user is running a service, and now with the new update, you can see the content of that service automatically.
+IMPORTANT: It only works in bash and sh, in any other type of shell, it won't work.
